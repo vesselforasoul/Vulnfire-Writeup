@@ -1,18 +1,18 @@
-# Vulnfire-Writeup
-Writeup for Vulnfire CTF machine
-
 # Vulnfire 
 This is a writeup for a CTF machine leveled as easy created by @hellfire and @xploit.
 Download link - [Google Drive Link](https://drive.google.com/file/d/1U6tLn-VgHD4dcU2sAhCL5V1mKykympKm/view?usp=sharing "https://drive.google.com/file/d/1U6tLn-VgHD4dcU2sAhCL5V1mKykympKm/view?usp=sharing")
 Note from creators - 
+
 **NOTE : The mentioned CTF is uploaded in google drive with a name of the file, VULNFIRE.ova. Download the file and start the hunt. It might be best if you use VirtualBox because it works fine on it rather than VMWare.**
-Complete the installation of box and the networking part.
-Find the ip of box using nmap for the range of the network.
-for example - nmap 10.10.10.2/24
+
+Install the machine by importing the .ova file in virtualbox and setting up Networking part as you would do with VulnHub machines.
+Find the IP address by scanning the network interface using CIDR notation with nmap.
+For example, Since i set up machines on an Internal network to communicate on, i took my attacker machine's ip and scanned `IP_address/24`
 
 ---
 ## Recon
-Using nmap to find open ports on the target 
+Let's start by enumerating the ip address and finding open ports and services exposed.
+Using nmap with deafult script tag and version enumeration to find open ports on the target 
 ```
 Nmap 7.92 scan initiated Mon Jul  4 15:13:03 2022 as: nmap -sC -sV -vv -oN nmap.txt 10.10.10.2
 Nmap scan report for 10.10.10.2
@@ -57,17 +57,21 @@ Service detection performed. Please report any incorrect results at https://nmap
 Nmap done at Mon Jul  4 15:13:45 2022 -- 1 IP address (1 host up) scanned in 42.52 seconds
 ```
 
-According to the scan , there are 3 ports open. I only scanned 1000 ports since i knew this is a easy box and it wouldn't be configured on ports not default to services.
+According to the scan , there are 3 ports open. I only scanned 1000 ports in this case but a full port scan is always beneficial.
 Let's enumerate these services one by one.
 
 ### Enumerating Anonymous FTP
-By nmap script scan, it tells us there is anonymous login enabled on the ftp server. Provide the username as Anonymous and leave password empty.
+By going through nmap results, it tells us there is an anonymous login enabled on the ftp server. Provide the username as Anonymous and leave password empty.
 You will get into the server. There are two interesting files there.
-![[ftp_login.png]]
+
+![FTP login](./resources/ftp_login.png)
+
 I got those two files on my machine using `get filename`.
 
 Contents of note.txt 
-![[note_txt_ftp.png]]
+
+![FTP note.txt](./resources/note_txt_ftp.png)
+
 It gives 3 hints:
 - webserver has a file which contain some kind of key
 - there are php files on the webserver
@@ -75,53 +79,66 @@ It gives 3 hints:
 
 Unzipping confidential.zip
 It gives two files , fire.jpg and secret.txt 
-![[fire_jpg_ftp.png]]
+
+![FTP fire.jpg](./resources/fire_jpg_ftp.png)
+
 This image may contain steganographic data.
 Tried different steg tools but couldn't find something for now.
 Maybe we need a key to extract the data
 
 Checking the other file
-![[secret_txt_ftp.png]]
-It tells us that the webserver shows default ubuntu page as nothing is configured for it. It also points that we have to perform fuzzing with certain file extensions to find files or directories which are not supposed to be exposed to regular user.
+
+![FTP secret.txt](./resources/secret_txt_ftp.png)
+
+It tells us that the webserver shows default ubuntu page as nothing is configured for it. It also points that we have to perform fuzzing with certain file extension to find files existing on webserver.
 
 ### Enumerating HTTP
-Visited the http server. Found default page as stated above.
-Tried opening robots.txt and viewing source code , not much to be found. 
+Visited the http server and found default page as stated above.
+I tried opening robots.txt, viewing source code and other manual enumeration steps, nothing of interest found. 
 Since we don't have any other data to look at and also the hint pointed, we fuzz for files and directories.
-Used Gobuster with extensions .php as mentioned in ftp files
-![[gobuster_log.png]]
+Used Gobuster with extension `.php` as mentioned in ftp file.
+
+![Gobuster Log](./resoucres/gobuster_log.png)
+
 found a file which have 200 response code.
 It redirects to op_security.php?cmd= 
-Since the file had a parameter , tried injecting commands and lfi nothing worked 
-checked source code and found list of all parameters present
-![[source_code 1.png]]
-copied them into a dict file.
-used ffuf for fuzzing the parameter with id value
+Since the file had a parameter , i tried injecting commands & checked for LFI using different payload cases.
+After wasting around 5-10 mins, checked source code and found list of all parameters present(Check source code in starting, might save some time for you. Don't be a noob like me :) )
+
+![Source code](./resoucres/source_code.png)
+
+copied them into a txt file.
+used ffuf for fuzzing the parameter with `id` value(could be any command which gives results)
 `ffuf -c -u 'http://$ip/op_security.php?FUZZ=id' -w dic.txt`
-![[ffuf_results.png]]
+
+![ffuf output](./resources/ffuf_results.png)
+
 All the parameters have same output but one stands out as it have different number of output lines.
 used that and tried command injection and it was successfull
-![[mal_id_cmd.png]]
-![[mal_ls_cmd.png]]
+
+![id](./resources/mal_id_cmd.png)
+![ls](./resources/mal_ls_cmd.png)
 
 read the file using cat
 
-![[http_file_ouput.png]]
+![Key](./resources/http_file_output.png)
+
 Since it talks about steganography , tried that password for extracting files from the image.
 
 ### Getting access to system
 used steghide on fire.jpg with above password
 it extracted creds.txt
-![[creds_txt_steg.png]]
-It have the credentials for user but is encoded. The note tells us about decoding it as 'Vignere cipher' as it says 'Vi..' also it have provided the key to the cipher by highlighting the word **Think** with quotes.
+
+![creds.txt](./resources/creds_txt_steg.png)
+
+It have the credentials for user but is encoded. The note tells us about decoding it as 'Vignere cipher' as it says 'Vi.. Cypher' . Also, it have provided the key to the cipher by highlighting the word **Think** with quotes.
 using 'Think' as key and decoding string using online sites.
 found creds for the user for ssh
-`hellfire:xplo1t&hellfirearenoobs`
 
 ### Lateral Privesc
 found user.txt and a message.txt
 
-![[osint_hint.png]]
+![osint hint](./resources/osint_hint.png)
 
 Quickly searched for user on twitter cause that's the most used osint social media account. Maybe would have used sherlock if haven't found it.
 Found a paste-bin for leaked credentials , maybe there is password for another user that is on the machine i.e xploit.
@@ -133,40 +150,43 @@ found 171 passwords , saved in a passwords.txt file
 
 used hydra to bruteforce ssh pass for xploit
 
-![[hydra_brute.png]]
-`xploit:vcdkqhhqdtvxbc3c4mj3238gg`
+![hydra](./resources/hydra_brute.png)
+
 
 ### Privesc to root
 Login as xploit using above creds.
 found evil.txt which says:
 `#TryHarder! Root password is unusual among many...`
-suggested that there is a password leak somewhere and it contains many passwords , one of them is root's.
+It suggested that there is a password leak somewhere and it contains many passwords , one of them is root's and it is unusual (not common).
 
-tried some manual recon and found interesting file in /var/backups/.bak
+tried some manual recon and found interesting file in /var/backups/.bak (Thanks to IppSec for this)
 used `tar -xvf secret.tar`
-After extracting , it gave out 4 pcap files
-transferred them to my machine
+After extracting , it gave out 4 pcap files.
+I transferred them to my machine using scp.
 Since they are pcaps, thought of using wireshark but basic forensics comes first.
-run strings on first , nothing useful
-run strings on second, found it contains ftp login packet capture ( as ftp is in plaintext)
+Ran strings on first , nothing seems unusual.
+Ran strings on second, found it contains ftp login packet capture ( as ftp is in plaintext)
 
-![[root_ftp_info.png]]
+![pcap analysis](./resources/root_ftp_info.png)
 
 there are passwords supplied too.
 found different passwords for root
-grep for only lines which contains passwords
+grep for lines which contains passwords only.
 one password stands out and hint pointed the root's password to be unusual among many.
 
-![[root_pass.png]]
-`Fv67i_+28WRT0mY7x`  
+![Root password](./resources/root_pass.png)
+
 ### Getting the root flag
 `su root` with this password and now we are root
 found confidential.txt which says to read about.me file
-![[root_flag_task.png]]
+
+![Task](./resources/root_flag_task.png)
 
 about.me is encoded 
 
-![[root_aboutme_enc.png]]
+![Encoded flag](./resources/root_aboutme_enc.png)
+
 Looks like simple base64 
 base64 decode it and found the flag.
-![[root_flag_dcod.png]]
+
+![Root flag](./resources/root_flag_dcod.png)
