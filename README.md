@@ -1,6 +1,7 @@
 # Vulnfire 
-This is a writeup for a CTF machine leveled as easy created by @hellfire and @xploit.
+This is a writeup for a CTF machine leveled as easy created by [Hellfire](https://twitter.com/Hellfire0x01) and [xploit](https://twitter.com/manash036). The machine was introduced on [HIH Community's](https://twitter.com/hih_community) discord server.
 Download link - [Google Drive Link](https://drive.google.com/file/d/1U6tLn-VgHD4dcU2sAhCL5V1mKykympKm/view?usp=sharing "https://drive.google.com/file/d/1U6tLn-VgHD4dcU2sAhCL5V1mKykympKm/view?usp=sharing")
+
 Note from creators - 
 
 **NOTE : The mentioned CTF is uploaded in google drive with a name of the file, VULNFIRE.ova. Download the file and start the hunt. It might be best if you use VirtualBox because it works fine on it rather than VMWare.**
@@ -98,14 +99,14 @@ I tried opening robots.txt, viewing source code and other manual enumeration ste
 Since we don't have any other data to look at and also the hint pointed, we fuzz for files and directories.
 Used Gobuster with extension `.php` as mentioned in ftp file.
 
-![Gobuster Log](./resoucres/gobuster_log.png)
+![Gobuster Log](./resources/gobuster_log.png)
 
 found a file which have 200 response code.
 It redirects to op_security.php?cmd= 
 Since the file had a parameter , i tried injecting commands & checked for LFI using different payload cases.
 After wasting around 5-10 mins, checked source code and found list of all parameters present(Check source code in starting, might save some time for you. Don't be a noob like me :) )
 
-![Source code](./resoucres/source_code.png)
+![Source code](./resources/source_code.png)
 
 copied them into a txt file.
 used ffuf for fuzzing the parameter with `id` value(could be any command which gives results)
